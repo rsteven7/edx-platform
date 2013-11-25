@@ -15,7 +15,7 @@ from courseware.tests.factories import StaffFactory, InstructorFactory
 
 
 @step(u'Given I am "([^"]*)" for a course')
-def i_am_an_instructor(step, role):  # pylint: disable=W0613
+def i_am_an_instructor(step, role):  # pylint: disable=unused-argument
 
     # Store the role
     assert_in(role, ['instructor', 'staff'])
@@ -89,7 +89,7 @@ SEND_TO_OPTIONS = {
 
 
 @step(u'I send email to "([^"]*)"')
-def when_i_send_an_email(step, recipient):
+def when_i_send_an_email(step, recipient):  # pylint: disable=unused-argument
 
     # Check that the recipient is valid
     assert_in(
@@ -138,7 +138,7 @@ UNSUBSCRIBE_MSG = 'To stop receiving email like this'
 
 
 @step(u'Email is sent to "([^"]*)"')
-def then_the_email_is_sent(step, recipient):
+def then_the_email_is_sent(step, recipient):  # pylint: disable=unused-argument
     # Check that the recipient is valid
     assert_in(
         recipient, SEND_TO_OPTIONS,
