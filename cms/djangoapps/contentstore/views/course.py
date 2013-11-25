@@ -38,7 +38,7 @@ from models.settings.course_metadata import CourseMetadata
 from auth.authz import create_all_course_groups, is_user_in_creator_group
 from util.json_request import expect_json
 
-from .access import has_access, get_location_and_verify_access
+from .access import has_access
 from .tabs import initialize_course_tabs
 from .component import (
     OPEN_ENDED_COMPONENT_TYPES, NOTE_COMPONENT_TYPES,
@@ -57,7 +57,7 @@ __all__ = ['course_info_handler', 'course_handler', 'course_info_update_handler'
            'settings_handler',
            'grading_handler',
            'advanced_settings_handler',
-           'textbook_index', 'textbook_by_id',
+           'textbooks_list_handler', 'textbooks_detail_handler',
            'create_textbook']
 
 
@@ -657,19 +657,24 @@ def assign_textbook_id(textbook, used_ids=()):
     return tid
 
 
+@require_http_methods(("GET", "POST"))
 @login_required
 @ensure_csrf_cookie
-def textbook_index(request, org, course, name):
+def textbooks_list_handler(request, tag=None, course_id=None, branch=None, version_guid=None, block=None):
     """
     Display an editable textbook overview.
 
     org, course, name: Attributes of the Location for the item to edit
     """
-    location = get_location_and_verify_access(request, org, course, name)
-    store = get_modulestore(location)
-    course_module = store.get_item(location, depth=3)
+    course_locator = BlockUsageLocator(course_id=course_id, branch=branch, version_guid=version_guid, usage_id=block)
+    if not has_access(request.user, course_locator):
+        raise PermissionDenied()
 
-    if request.is_ajax():
+    course_location = loc_mapper().translate_locator_to_location(course_locator)
+    store = get_modulestore(course_location)
+    course_module = store.get_item(course_location, depth=3)
+
+    if "application/json" in request.META.get('HTTP_ACCEPT', 'text/html'):
         if request.method == 'GET':
             return JsonResponse(course_module.pdf_textbooks)
         # can be either and sometimes django is rewriting one to the other:
@@ -698,13 +703,8 @@ def textbook_index(request, org, course, name):
             )
             return JsonResponse(course_module.pdf_textbooks)
     else:
-        new_loc = loc_mapper().translate_location(location.course_id, location, False, True)
-        upload_asset_url = new_loc.url_reverse('assets/', '')
-        textbook_url = reverse('textbook_index', kwargs={
-            'org': org,
-            'course': course,
-            'name': name,
-        })
+        upload_asset_url = course_locator.url_reverse('assets/', '')
+        textbook_url = course_locator.url_reverse('/textbooks')
         return render_to_response('textbooks.html', {
             'context_course': course_module,
             'course': course_module,
@@ -716,13 +716,17 @@ def textbook_index(request, org, course, name):
 @require_POST
 @login_required
 @ensure_csrf_cookie
-def create_textbook(request, org, course, name):
+def create_textbook(request, tag=None, course_id=None, branch=None, version_guid=None, block=None):
     """
     JSON API endpoint for creating a textbook. Used by the Backbone application.
     """
-    location = get_location_and_verify_access(request, org, course, name)
-    store = get_modulestore(location)
-    course_module = store.get_item(location, depth=0)
+    course_locator = BlockUsageLocator(course_id=course_id, branch=branch, version_guid=version_guid, usage_id=block)
+    if not has_access(request.user, course_locator):
+        raise PermissionDenied()
+
+    course_location = loc_mapper().translate_locator_to_location(course_locator)
+    store = get_modulestore(course_location)
+    course_module = store.get_item(course_location, depth=0)
 
     try:
         textbook = validate_textbook_json(request.body)
@@ -743,26 +747,26 @@ def create_textbook(request, org, course, name):
     course_module.save()
     store.update_metadata(course_module.location, own_metadata(course_module))
     resp = JsonResponse(textbook, status=201)
-    resp["Location"] = reverse("textbook_by_id", kwargs={
-        'org': org,
-        'course': course,
-        'name': name,
-        'tid': textbook["id"],
-    })
+    resp["Location"] = course_locator.url_reverse('/textbooks/{tid}'.format(
+        tid=textbook['id']))
     return resp
 
 
 @login_required
 @ensure_csrf_cookie
 @require_http_methods(("GET", "POST", "PUT", "DELETE"))
-def textbook_by_id(request, org, course, name, tid):
+def textbooks_detail_handler(request, tid, tag=None, course_id=None, branch=None, version_guid=None, block=None):
     """
     JSON API endpoint for manipulating a textbook via its internal ID.
     Used by the Backbone application.
     """
-    location = get_location_and_verify_access(request, org, course, name)
-    store = get_modulestore(location)
-    course_module = store.get_item(location, depth=3)
+    course_locator = BlockUsageLocator(course_id=course_id, branch=branch, version_guid=version_guid, usage_id=block)
+    if not has_access(request.user, course_locator):
+        raise PermissionDenied()
+
+    course_location = loc_mapper().translate_locator_to_location(course_locator)
+    store = get_modulestore(course_location)
+    course_module = store.get_item(course_location, depth=3)
     matching_id = [tb for tb in course_module.pdf_textbooks
                    if str(tb.get("id")) == str(tid)]
     if matching_id:
