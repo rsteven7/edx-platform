@@ -390,8 +390,11 @@ def setup_sneakpeek(request, course_id):
         logout(request)
         _create_and_login_nonregistered_user(request)
 
-    can_enroll, error_msg = _check_can_enroll_in_course(request.user, course_id)
+    can_enroll, error_msg = _check_can_enroll_in_course(request.user,
+                                                        course_id,
+                                                        access_type='within_enrollment_period')
     if not can_enroll:
+        log.error(error_msg)
         return HttpResponseBadRequest(error_msg)
 
     CourseEnrollment.enroll(request.user, course_id)
@@ -510,7 +513,7 @@ def change_enrollment(request):
         return HttpResponseBadRequest(_("Enrollment action is invalid"))
 
 
-def _check_can_enroll_in_course(user, course_id):
+def _check_can_enroll_in_course(user, course_id, access_type="enroll"):
     """
     Refactored check for user being able to enroll in course
     Returns (bool, error_message), where error message is only applicable if bool == False
@@ -522,7 +525,7 @@ def _check_can_enroll_in_course(user, course_id):
                     .format(user.username, course_id))
         return False, _("Course id is invalid")
 
-    if not has_access(user, course, 'enroll'):
+    if not has_access(user, course, access_type):
         return False, _("Enrollment is closed")
 
     return True, ""

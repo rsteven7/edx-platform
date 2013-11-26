@@ -628,9 +628,11 @@ def course_about(request, course_id):
     # 1) within enrollment period
     # 2) course specifies it's okay
     # 3) request.user is not a registered user.
-    sneakpeek_allowed = (has_access(request.user, course, 'enroll') and
+    sneakpeek_allowed = (has_access(request.user, course, 'within_enrollment_period') and
                          CoursePreference.course_allows_nonregistered_access(course_id) and
                          not UserProfile.has_registered(request.user))
+
+    print(sneakpeek_allowed)
 
     return render_to_response('courseware/course_about.html',
                               {'course': course,

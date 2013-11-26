@@ -122,6 +122,16 @@ def _has_access_course_desc(user, course, action):
              _has_staff_access_to_descriptor(user, course))
         )
 
+    def within_enrollment_period():
+        """
+        Just a time boundary check, handles if start or stop were set to None
+        """
+        now = datetime.now(UTC())
+        start = course.enrollment_start
+        end = course.enrollment_end
+
+        return (start is None or now > start) and (end is None or now < end)
+
     def can_enroll():
         """
         First check if restriction of enrollment by login method is enabled, both
@@ -146,11 +156,7 @@ def _has_access_course_desc(user, course, action):
         else:
             reg_method_ok = True #if not using this access check, it's always OK.
 
-        now = datetime.now(UTC())
-        start = course.enrollment_start
-        end = course.enrollment_end
-
-        if reg_method_ok and (start is None or now > start) and (end is None or now < end):
+        if reg_method_ok and within_enrollment_period():
             # in enrollment period, so any user is allowed to enroll.
             debug("Allow: in enrollment period")
             return True
@@ -190,6 +196,7 @@ def _has_access_course_desc(user, course, action):
         'load_forum': can_load_forum,
         'enroll': can_enroll,
         'see_exists': see_exists,
+        'within_enrollment_period': within_enrollment_period,
         'staff': lambda: _has_staff_access_to_descriptor(user, course),
         'instructor': lambda: _has_instructor_access_to_descriptor(user, course),
         }
